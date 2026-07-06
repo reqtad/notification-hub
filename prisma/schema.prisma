@@ -1,0 +1,134 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// 1. ENUMS (Các định nghĩa hằng số hệ thống)
+// ==========================================
+
+enum ChannelType {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum PriorityLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum NotificationStatus {
+  PENDING      // Mới tiếp nhận từ API, đang chờ kiểm tra
+  QUEUED       // Đã đẩy vào hàng đợi (Cloud Tasks / Queue) thành công
+  PROCESSING   // Worker đang thực thi render và gọi nhà mạng
+  SENT         // Gửi thành công tới nhà cung cấp (Resend, Twilio...)
+  FAILED       // Gửi thất bại hoàn toàn sau các lượt retry
+  CANCELLED    // Bị hủy trước khi gửi (dành cho các lịch gửi hẹn giờ)
+}
+
+enum ScheduleType {
+  IMMEDIATE    // Gửi ngay lập tức
+  DELAYED      // Hẹn giờ gửi một lần vào thời điểm tương lai
+  CRON         // Gửi lặp lại định kỳ theo biểu thức Cron
+}
+
+enum ScheduleStatus {
+  ACTIVE       // Lịch trình đang chờ đến giờ kích hoạt
+  COMPLETED    // Lịch trình đã hoàn thành
+  CANCELLED    // Lịch trình đã bị hủy từ Dashboard
+}
+
+// ==========================================
+// 2. MODELS (Các thực thể dữ liệu chính)
+// ==========================================
+
+/// Module 4: Quản lý mẫu thông báo đa kênh & Đa ngôn ngữ (i18n)
+model Template {
+  id        String      @id @default(uuid())
+  key       String      // Mã định danh mẫu, VD: "ORDER_CONFIRMED", "OTP_VERIFICATION"
+  locale    String      @default("vi") // Ngôn ngữ: "vi", "en", "ja"...
+  name      String      // Tên hiển thị thân thiện trên Dashboard UI
+  subject   String?     // Tiêu đề thông báo (Chỉ áp dụng chủ yếu cho EMAIL hoặc PUSH)
+  content   String      // Nội dung chứa biến Handlebars: "Chào {{name}}, mã OTP là {{code}}"
+  channel   ChannelType
+
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // Ràng buộc duy nhất: Không thể có 2 mẫu cùng Key + Ngôn ngữ trên cùng 1 Kênh
+  @@unique([key, locale, channel])
+  @@index([key])
+}
+
+/// Module 1 & 2: Thực thể trung tâm tiếp nhận yêu cầu phân phối thông báo
+model Notification {
+  id              String             @id
+  idempotencyKey  String             @unique
+  sourceService   String
+  userId          String?
+  recipientTarget String
+  channel         ChannelType
+  priority        PriorityLevel      @default(MEDIUM)
+  status          NotificationStatus @default(PENDING)
+  
+  templateKey     String
+  templateData    Json               @default("{}")
+  locale          String             @default("vi")
+
+  schedule        Schedule?
+  
+  // Sửa lại chuẩn xác relation trỏ đến model NotificationLog
+  logs            NotificationLog[]
+
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+  @@index([sourceService])
+}
+
+/// Module 3: Quản lý hẹn giờ và lịch gửi thông báo
+model Schedule {
+  id             String         @id @default(uuid())
+  notificationId String         @unique
+  notification   Notification   @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  
+  type           ScheduleType   @default(IMMEDIATE)
+  status         ScheduleStatus @default(ACTIVE)
+  
+  executeAt      DateTime?      // Thời gian thực thi chính xác (Dành cho DELAYED)
+  cronExpression String?        // Biểu thức Cron cấu hình định kỳ: "0 9 * * *" (Dành cho CRON)
+  
+  // Mã theo dõi task trên hệ thống hàng đợi (VD: Task Name trong Google Cloud Tasks)
+  taskId         String?        
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([status, executeAt])
+}
+
+/// Bảng theo dõi lịch sử gửi & Ghi vết lỗi (Phục vụ UI Dashboard và Debug)
+model NotificationLog {
+  id             String             @id @default(uuid())
+  notificationId String
+  notification   Notification       @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  
+  status         NotificationStatus
+  provider       String?            // Tên nhà mạng thực hiện: "Resend", "Twilio", "Firebase Push"
+  errorDetails   String?            // Chi tiết lỗi trả về nếu nhà mạng từ chối hoặc lỗi mạng
+  durationMs     Int?               // Thời gian xử lý mất bao nhiêu mili-giây (Đo hiệu năng)
+  
+  createdAt      DateTime           @default(now())
+
+  @@index([notificationId])
+  @@index([createdAt])
+}
