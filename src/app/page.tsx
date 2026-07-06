@@ -1,65 +1,133 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
 
 export default function Home() {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+
+  // Dữ liệu form mặc định
+  const [formData, setFormData] = useState({
+    recipientTarget: 'dat.test@gmail.com',
+    channel: 'EMAIL',
+    priority: 'HIGH',
+    templateKey: 'WELCOME_OTP',
+    name: 'Phát Đạt',
+    otp: '889900',
+    delaySeconds: 0,
+  });
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setResult(null);
+
+    try {
+      const res = await fetch('/api/notifications/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          idempotencyKey: `req_${Date.now()}`, // Tự sinh key mới mỗi lần bấm
+          sourceService: 'web-dashboard',
+          recipientTarget: formData.recipientTarget,
+          channel: formData.channel,
+          priority: formData.priority,
+          templateKey: formData.templateKey,
+          templateData: {
+            name: formData.name,
+            otp: formData.otp,
+          },
+          delaySeconds: Number(formData.delaySeconds),
+        }),
+      });
+
+      const data = await res.json();
+      setResult({ status: res.status, data });
+    } catch (err: any) {
+      setResult({ error: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main className="min-h-screen bg-neutral-950 text-neutral-100 p-8 flex flex-col items-center justify-center">
+      <div className="max-w-md w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-xl">
+        <h1 className="text-xl font-bold text-white mb-1">🚀 Notification Gateway</h1>
+        <p className="text-sm text-neutral-400 mb-6">Bảng điều khiển gửi thông báo bất đồng bộ</p>
+
+        <form onSubmit={handleSend} className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-neutral-400 mb-1">Kênh gửi (Channel)</label>
+            <select
+              value={formData.channel}
+              onChange={(e) => setFormData({ ...formData, channel: e.target.value })}
+              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2.5 text-sm focus:outline-none focus:border-white"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+              <option value="EMAIL">EMAIL (Resend)</option>
+              <option value="SMS">SMS (Twilio)</option>
+              <option value="PUSH">PUSH (Firebase)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-neutral-400 mb-1">Người nhận (Target)</label>
+            <input
+              type="text"
+              value={formData.recipientTarget}
+              onChange={(e) => setFormData({ ...formData, recipientTarget: e.target.value })}
+              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2.5 text-sm focus:outline-none focus:border-white"
+              required
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-neutral-400 mb-1">Tên người dùng</label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2 text-sm focus:outline-none focus:border-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-neutral-400 mb-1">Mã OTP</label>
+              <input
+                type="text"
+                value={formData.otp}
+                onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2 text-sm focus:outline-none focus:border-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-neutral-400 mb-1">Hẹn giờ gửi (Giây - 0 là gửi ngay)</label>
+            <input
+              type="number"
+              value={formData.delaySeconds}
+              onChange={(e) => setFormData({ ...formData, delaySeconds: Number(e.target.value) })}
+              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2.5 text-sm focus:outline-none focus:border-white"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-white text-black font-semibold py-2.5 rounded-lg text-sm hover:bg-neutral-200 transition disabled:opacity-50 mt-2"
           >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            {loading ? '⏳ Đang đẩy vào hàng đợi...' : 'Phát lệnh gửi tin (Dispatch Job)'}
+          </button>
+        </form>
+
+        {result && (
+          <div className="mt-6 p-4 bg-neutral-950 border border-neutral-800 rounded-lg overflow-x-auto">
+            <div className="text-xs font-mono text-neutral-400 mb-1">Phản hồi từ Gateway:</div>
+            <pre className="text-xs text-green-400">{JSON.stringify(result, null, 2)}</pre>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
