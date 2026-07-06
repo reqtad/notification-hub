@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@google-cloud/tasks": "^6.2.3",
+    "@neondatabase/serverless": "^1.1.0",
+    "@prisma/adapter-neon": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@upstash/qstash": "^2.11.1",
     "next": "16.2.10",
