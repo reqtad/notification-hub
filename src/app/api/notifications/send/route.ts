@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { Client as QStashClient } from '@upstash/qstash';
 
-const prisma = new PrismaClient();
 const qstash = new QStashClient({ token: process.env.QSTASH_TOKEN! });
 
 export async function POST(req: NextRequest) {

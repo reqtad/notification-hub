@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
 
-const prisma = new PrismaClient();
 
 // Hàm xử lý chính khi QStash gửi Job tới
 async function handler(req: NextRequest) {
