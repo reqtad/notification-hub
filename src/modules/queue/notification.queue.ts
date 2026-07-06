@@ -24,7 +24,7 @@ export async function dispatchNotificationJob({
     url: targetUrl,
     body: { notificationId },
     // Cấu hình thời gian trì hoãn (Scheduler)
-    delay: delaySeconds > 0 ? `${delaySeconds}s` : undefined,
+    delay: delaySeconds > 0 ? delaySeconds : undefined,
     retries,
   });
 }
